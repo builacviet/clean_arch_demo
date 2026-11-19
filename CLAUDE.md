@@ -1,6 +1,6 @@
 # AGENTS.md - Clean Architecture & Engineering Rules
 
-You are working on a Python 3.12 project strictly following **Clean Architecture** (Feature-sliced within Layers). Any code you generate or modify MUST pass all static analysis and architectural gates in CI.
+You are working on a Python 3.12 project strictly following **Clean Architecture** (Feature-sliced within Layers). Any code you generate or modify MUST pass all static analysis, type checking, and architectural gates in CI.
 
 ---
 
@@ -30,34 +30,40 @@ Dependencies MUST ONLY point inwards:
   - Every parameter in `UseCase.__init__` MUST have an explicit type annotation; **`Any` is strictly forbidden**.
   - Use Cases MUST NOT call other Use Cases directly. Inject the required `I*Repository` interface instead.
   - External API calls or message publishing (RabbitMQ) MUST execute **outside** the `async with self._uow:` database transaction block.
+  - For operational logging inside Use Cases, use Python's standard `logging.getLogger(__name__)` ONLY (never `print()`).
 
-### `src/infrastructure/` (Adapters & Configuration)
-- **Allowed:** Implements interfaces defined in `src.application` using concrete libraries (`SQLAlchemy`, `HTTPX`, `aio-pika`, `pydantic-settings`).
+### `src/infrastructure/` (Adapters, Observability & Configuration)
+- **Allowed:** Implements interfaces defined in `src.application` using concrete libraries (`SQLAlchemy`, `HTTPX`, `aio-pika`, `pydantic-settings`), plus JSON structured logging and `ContextVar` correlation ID management (`src/infrastructure/observability/`).
 - **Rules:**
   - Repositories (`sqlalchemy_*_repo.py`) MUST map between ORM Models and Domain Entities, and call `await session.flush()` instead of `commit()` (transaction commits belong to `UnitOfWork`).
   - Environment variables MUST only be accessed via `AppConfig` (`src/infrastructure/config/app_config.py`). If adding a new env variable, update `AppConfig` and `.env.example` ONLY (never modify `.env`).
 
-### `src/presentation/` (FastAPI Routers, Celery Workers & Composition Root)
-- **Allowed:** FastAPI routers (`api/v1/`), Celery tasks (`workers/`), and Dependency Injection wiring (`dependencies/`).
+### `src/presentation/` (FastAPI Routers, Middlewares, Celery Workers & Composition Root)
+- **Allowed:** FastAPI routers (`api/v1/`), HTTP middlewares (`api/middlewares/`), Celery tasks (`workers/`), and Dependency Injection wiring (`dependencies/`).
 - **Rules:**
   - FastAPI endpoints and Celery tasks MUST NOT contain business logic or direct database queries. They only parse input DTOs, invoke a `UseCase`, and map domain exceptions to HTTP responses or task outputs.
+  - Health check endpoints (`/health/live`, `/health/ready`) MUST remain lightweight and free of domain business logic.
 
 ---
 
-## 2. Coding Standards & Complexity Limits
+## 2. Coding Standards & Type Safety (Mypy Strict Mode)
 - **Line length:** Maximum `100` characters.
 - **Function complexity:** McCabe complexity (`C901`) MUST NOT exceed `10`. Break large functions into small, focused helper methods.
-- **Type annotations:** All function signatures and return types MUST be explicitly typed.
+- **Strict Type Safety (`mypy --strict`):**
+  - All function parameters, return types, class attributes, and generic collections (e.g., `list[str]`, `dict[str, object]`) MUST be explicitly typed across `src/`.
+  - `Any` is forbidden in domain/application code and discouraged everywhere else.
+  - Never add blanket `# type: ignore` comments; fix the underlying type mismatch or handle `None` explicitly.
 
 ---
 
 ## 3. Mandatory Pre-Completion Verification
-Before finishing any task or submitting code, you MUST run and pass all four commands below with zero errors:
+Before finishing any task or submitting code, you MUST run and pass all five commands below with zero errors:
 
 ```bash
-ruff format --check src tests
-ruff check src tests
+ruff format --check src tests alembic
+ruff check src tests alembic
 lint-imports
+python -m mypy src
 python -m unittest discover -s tests -p "test_*.py" -v
 ```
 

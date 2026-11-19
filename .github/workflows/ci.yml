@@ -57,6 +57,11 @@ jobs:
           PYTHONPATH: "."
         run: lint-imports
 
+      - name: Check Static Type Safety (Mypy Strict)
+        env:
+          PYTHONPATH: "."
+        run: python -m mypy src
+
       - name: Run AST Architecture & Coverage Gate
         env:
           PYTHONPATH: "."
