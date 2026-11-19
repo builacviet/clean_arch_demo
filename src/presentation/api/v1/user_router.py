@@ -1,7 +1,7 @@
 import uuid
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel, Field, field_validator
 
 from src.application.user.use_cases.register_user import (
     RegisterUserInput,
@@ -15,9 +15,30 @@ router = APIRouter(prefix="/api/v1/users", tags=["Users"])
 
 
 class RegisterRequest(BaseModel):
-    email: EmailStr
-    password: str
-    full_name: str
+    email: str = Field(..., min_length=5, max_length=255)
+    password: str = Field(..., min_length=8, max_length=64)
+    full_name: str = Field(..., min_length=2, max_length=100)
+
+    @field_validator("password")
+    @classmethod
+    def check_password_strength(cls, v: str) -> str:
+        # Ví dụ: Không cho phép mật khẩu chứa khoảng trắng
+        if " " in v:
+            raise ValueError("Mật khẩu không được chứa khoảng trắng")
+
+        # Ví dụ: Phải có ít nhất 1 chữ số
+        if not any(char.isdigit() for char in v):
+            raise ValueError("Mật khẩu phải chứa ít nhất 1 chữ số")
+
+        return v
+
+    @field_validator("full_name")
+    @classmethod
+    def clean_full_name(cls, v: str) -> str:
+        cleaned = v.strip()
+        if not cleaned:
+            raise ValueError("Họ tên không được chỉ chứa khoảng trắng")
+        return cleaned
 
 
 class RegisterResponse(BaseModel):

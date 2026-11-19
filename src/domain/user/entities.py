@@ -2,7 +2,7 @@ import uuid
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 
-from src.domain.user.exceptions import InvalidEmailError
+from src.domain.user.validators import validate_custom_email
 
 
 @dataclass
@@ -14,5 +14,5 @@ class User:
     created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
 
     def __post_init__(self) -> None:
-        if "@" not in self.email or "." not in self.email:
-            raise InvalidEmailError(self.email)
+        self.email = self.email.strip().lower()
+        validate_custom_email(self.email)
