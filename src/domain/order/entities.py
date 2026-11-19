@@ -2,8 +2,17 @@ import uuid
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from decimal import Decimal
+from enum import StrEnum
 
 from src.domain.order.exceptions import EmptyOrderError, InvalidItemQuantityError
+
+
+class OrderStatus(StrEnum):
+    PENDING = "PENDING"
+    CONFIRMED = "CONFIRMED"
+    SHIPPING = "SHIPPING"
+    COMPLETED = "COMPLETED"
+    CANCELLED = "CANCELLED"
 
 
 @dataclass(frozen=True)
