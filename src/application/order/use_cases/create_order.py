@@ -49,6 +49,8 @@ class CreateOrderUseCase:
             if user is None:
                 raise UserNotFoundError(str(input_data.user_id))
 
+            user.ensure_can_place_order()
+
             domain_items = [
                 OrderItem(
                     product_id=i.product_id,

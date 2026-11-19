@@ -10,7 +10,7 @@ from src.application.order.use_cases.create_order import (
 )
 from src.domain.order.exceptions import EmptyOrderError, InvalidItemQuantityError
 from src.domain.user.entities import User
-from src.domain.user.exceptions import UserNotFoundError
+from src.domain.user.exceptions import UserCannotPlaceOrderError, UserNotFoundError
 
 
 class TestCreateOrderUseCase(unittest.IsolatedAsyncioTestCase):
@@ -72,6 +72,32 @@ class TestCreateOrderUseCase(unittest.IsolatedAsyncioTestCase):
             await self.use_case.execute(input_data)
 
         self.mock_order_repo.save.assert_not_awaited()
+        self.mock_publisher.publish_order_created.assert_not_awaited()
+
+    async def test_create_order_inactive_user_raises_domain_error(self) -> None:
+        """User bị khóa (is_active=False): ném UserCannotPlaceOrderError."""
+        inactive_user = User(
+            email="blocked@example.com",
+            hashed_password="pw",
+            full_name="Blocked User",
+            is_active=False,
+        )
+        self.mock_user_repo.get_by_id.return_value = inactive_user
+
+        input_data = CreateOrderInput(
+            user_id=inactive_user.id,
+            items=[
+                CreateOrderItemInput(
+                    product_id="PROD-01", quantity=1, unit_price=Decimal("100.00")
+                ),
+            ],
+        )
+
+        with self.assertRaises(UserCannotPlaceOrderError):
+            await self.use_case.execute(input_data)
+
+        self.mock_order_repo.save.assert_not_awaited()
+        self.mock_uow.commit.assert_not_awaited()
         self.mock_publisher.publish_order_created.assert_not_awaited()
 
     async def test_create_order_empty_items_raises_domain_error(self) -> None:

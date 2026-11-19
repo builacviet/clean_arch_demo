@@ -10,7 +10,7 @@ Dependencies MUST ONLY point inwards:
 `src.presentation` -> `src.infrastructure` -> `src.application` -> `src.domain`
 
 ### `src/domain/` (Core Business Logic)
-- **Allowed:** Pure Python standard library (`dataclasses`, `typing`, `uuid`, `datetime`, `decimal`, `enum`) and `src.domain.shared`.
+- **Allowed:** Pure Python standard library (`dataclasses`, `typing`, `uuid`, `datetime`, `decimal`, `enum`, `re`) and `src.domain.shared`.
 - **Forbidden:**
   - NO imports from `application`, `infrastructure`, or `presentation`.
   - NO cross-domain imports (e.g., `src.domain.order` CANNOT import from `src.domain.user`). Put shared concepts in `src.domain.shared`.
@@ -85,3 +85,28 @@ python -m unittest discover -s tests -p "test_*.py" -v
   2. Domain rule violations and expected domain exceptions (ensuring `uow.commit()` and external calls are NOT triggered on failure).
 - **CI Enforcement:** The architectural test suite (`test_every_use_case_must_have_corresponding_unit_test`) automatically fails CI if any Use Case lacks a valid unit test file with `test_*` methods.
 - **Minimum 90% Code Coverage:** Core layers (`src/domain` and `src/application`) MUST maintain at least **90% branch and line coverage**. Before completing a task, run `coverage run -m unittest discover -s tests -p "test_*.py"` followed by `coverage report` to verify that coverage passes `fail_under = 90`.
+
+---
+
+## 6. Architectural Patterns, Helpers & Reference Examples
+
+### Placement of Helpers & Utilities (NO Global `utils/` Folder)
+- **NEVER** create generic top-level folders like `src/utils/`, `src/helpers/`, or `src/common/`.
+- **Pure Python Utilities** (string formatting, math, UTC time, slugify) -> `src/domain/shared/utils.py`.
+- **Domain-Specific Validators** (e.g., custom email rules) -> `src/domain/<feature>/validators.py` or inside `@dataclass(frozen=True)` Value Objects.
+- **Third-Party Library Helpers** (S3 upload, Excel export, JWT) -> Define a `Protocol` in `src/application/shared/ports.py` and implement it in `src/infrastructure/`.
+- **HTTP / API Helpers** (pagination wrappers, request header parsing) -> `src/presentation/api/utils.py`.
+
+### Validation Separation
+- **Presentation Layer (Pydantic):** Validate HTTP transport rules (field length, non-empty strings, raw password format) using `Field(...)` and `@field_validator` raising `ValueError` (HTTP `422`).
+- **Domain Layer (Entities & Validators):** Validate core business invariants (email syntax, active status, order limits) raising `DomainError` subclasses (HTTP `400`/`409`).
+
+### Cross-Domain Orchestration & Read Models (CQRS-Lite)
+- **Multi-Domain Commands:** Orchestrate multiple domains inside `src/application/<main_feature>/use_cases/` using `IUnitOfWork` (which exposes `uow.users`, `uow.orders`, etc.). Load Entity A, call its domain validation method (e.g., `user.ensure_can_place_order()`), mutate Entity B, and commit in a single transaction.
+- **Complex Read / Dashboard Queries:** Do NOT load full Domain Entities for aggregated views. Define flat Read DTOs and an `I*QueryRepository` Protocol in `src/application/<feature>/`, then implement optimized SQL JOINs/aggregations in `src/infrastructure/database/repositories/`.
+
+### Golden Reference Implementations (Follow These Patterns)
+- **Domain Entity & Custom Validator:** `src/domain/user/entities.py` & `src/domain/user/validators.py`
+- **Single-Domain Use Case & DTOs:** `src/application/user/use_cases/register_user.py`
+- **Cross-Domain Use Case (`User` + `Order`):** `src/application/order/use_cases/create_order.py`
+- **FastAPI Router & Request Validation:** `src/presentation/api/v1/user_router.py`
