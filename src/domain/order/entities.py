@@ -35,7 +35,7 @@ class Order:
     user_id: uuid.UUID
     items: list[OrderItem]
     id: uuid.UUID = field(default_factory=uuid.uuid4)
-    status: str = "PENDING"
+    status: str = OrderStatus.PENDING
     created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
 
     def __post_init__(self) -> None:
