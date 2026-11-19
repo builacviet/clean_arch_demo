@@ -21,7 +21,7 @@ jobs:
         ports:
           - 5432:5432
         options: >-
-          --health-cmd pg_isready
+          --health-cmd "pg_isready -U postgres -d clean_arch_db"
           --health-interval 10s
           --health-timeout 5s
           --health-retries 5
@@ -57,7 +57,7 @@ jobs:
           PYTHONPATH: "."
         run: lint-imports
 
-      - name: Run AST Architecture Unit Tests
+      - name: Run AST Architecture & Coverage Gate
         env:
           PYTHONPATH: "."
         run: |
@@ -68,4 +68,3 @@ jobs:
         run: |
           alembic upgrade head
           alembic check
-
